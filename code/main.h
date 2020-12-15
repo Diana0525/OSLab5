@@ -27,6 +27,6 @@ typedef struct inode {
 typedef struct dir_item {
     uint32_t inode_id;          // 目录项一个更常见的叫法是 dirent(directory entry)
     uint16_t valid;             // 当前目录项表示的文件/目录的对应inode
-    uint8_t type;               //当前目录项类型(文件/目录)
+    uint8_t type;               // 当前目录项类型(文件/目录)
     char name[121];             // 目录项表示的文件/目录的文件名/目录名
 } dir_item;
