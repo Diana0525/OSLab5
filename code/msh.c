@@ -178,9 +178,12 @@ int sh(){
   exit(0);
 }
 int main(){
+
     Init();
     /* sh(); */
-    TestInit();
+    /* TestInit(); */
+    /* 调试代码 */
+    readInodeMessage(char *dirname[])
     /************* 关闭磁盘 *************/
     close_disk();
     return 0;

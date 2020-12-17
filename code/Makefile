@@ -1,7 +1,7 @@
 cc = gcc
 prom = shell
 deps = disk.h
-obj = main.o disk.o msh.o
+obj = file.o disk.o msh.o
 
 $(prom): $(obj)
 	$(cc) -o $(prom) $(obj)
