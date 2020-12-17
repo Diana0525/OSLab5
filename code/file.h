@@ -61,6 +61,7 @@ void refreshInodemapinSuperBlock(uint32_t inode_id, int type);
 void refreshBlockmapinSuperBlock(uint32_t BlockID, int type);
 void refreshInode(uint32_t inode_id, uint16_t file_type, uint32_t file_size, uint32_t block_point, int i);
 uint32_t create(char filename[121], uint32_t inodeID, uint8_t file_type, uint32_t file_size);
-int readInodeMessage(char *dirname[]);
+uint32_t readInodeMessage(uint32_t inodeID, char name[]);
 void findinodepoint(uint32_t inode_id, struct inode* inode);
 int mystrcmp(char *a, char *b);
+int lsDirName(uint32_t inodeID, char* dirname[]);

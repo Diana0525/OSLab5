@@ -20,33 +20,8 @@ getcmd(char *buf, int nbuf)
   return 0;
 }
 /* 
-* 函数名：fork1
-* 函数功能：fork1函数负责生成子进程，并在返回错误时打印错误信息
- */
-int
-fork1(void)
-{
-  int pid;
-
-  pid = fork();
-  if(pid == -1)
-    panic("fork");
-  return pid;
-}
-
-/* 
-* 函数名：panic
-* 函数功能：panic函数负责输出错误信息
- */
-void
-panic(char* s)
-{
-  printf("%s\n", s);
-  exit(-1);
-}
-/* 
 * 函数名：clearcmd
-* 函数功能：解析输入的函数
+* 函数功能：解析输入的命令
  */
 void
 clearcmd(char* cmd, char* argv[],int* argc){
@@ -95,18 +70,25 @@ clearDir(char* dir, char* clear_dir[]){
     for(int i=0; i<MAXARGS; i++){
         clear_dir[i] = &after_clear[i][0];
     }
-    while(dir[i] == '\0'){ // 当前不是最后一个字符
-        if(dir[i] == '/'){ // 当前是“\”，表示目录的字符
-            i++;
-            count++;// 记录\的数目，一个\表示一个目录
+    /* 计算一共有多少个斜线 */
+    while(dir[i] != '\0'){
+        if(dir[i] == '/'){
+            count ++;
         }
-        clear_dir[j++] = dir;
-        while(dir[i] != '/'){
-            i++;
-        }
-        dir[i] = '\0'; // 两个斜线之间的字符存入after_clear
-        count++; // 斜线数目+1
+        i++;
     }
+    for(i = 0,j = 0; i < count-1; j++){
+        while(dir[j] == '/'){
+            j++;
+        }
+        clear_dir[i++] = dir+j;
+        
+        while(dir[j] != '/'){
+            j++;
+        }
+        dir[j] = '\0';
+    }
+    clear_dir[i] = dir+j;
     return count;
  }
 /* 
@@ -115,35 +97,48 @@ clearDir(char* dir, char* clear_dir[]){
  */
 void 
 runcmd(char* argv[],int argc){
-    printf("argc = %d",argc);
-    int num_dir,num_file;
+    printf("argc = %d\n",argc);
+    int num_dir,num_file;// num_dir表示有多少级目录，num_file表示该目录最终有多少文件
     uint32_t newinodeID;
-    char *dirname[MAXNUM_DIR];
+    char *dirname[MAXNUM_DIR];// 存储ls输出的内容
+    char* clear_dir[MAXARGS];
     newinodeID = 1 ;// 第一个inode的编号是1
     if(mystrcmp("touch",argv[0])==0){// 是创建文件的命令
         // 解析目录项
-        num_dir=clearDir(argv[1], after_clear);
+        num_dir=clearDir(argv[1], clear_dir);
         for(int i = 0; i < num_dir-1; i++){ // num_dir-1表示目录项
             // 新建目录项
-            newinodeID = create(after_clear[i], newinodeID, IsDir, 128);
+            newinodeID = create(clear_dir[i], newinodeID, IsDir, 128);
         }
-        newinodeID = create(after_clear[num_dir-1], newinodeID, IsFile, 128); // 创建指向文件的目录项
-        if(create(after_clear[num_dir-1], newinodeID, IsFile, 0) == 0){ // 默认文件大小为0
+        newinodeID = create(clear_dir[num_dir-1], newinodeID, IsFile, 128); // 创建指向文件的目录项
+        if(create(clear_dir[num_dir-1], newinodeID, IsFile, 0) == 0){ // 默认文件大小为0
             printf("touch file success!\n");
         }
     }
     else if(mystrcmp("mkdir",argv[0])==0){
         // 解析目录项
-        num_dir=clearDir(argv[1], after_clear);
+        num_dir=clearDir(argv[1], clear_dir);
         for(int i = 0; i < num_dir; i++){ // num_dir表示目录项
             // 新建目录项
-            newinodeID = create(after_clear[i], newinodeID, IsDir, 128);
+            newinodeID = create(clear_dir[i], newinodeID, IsDir, 128);
         }
     }
     else if(mystrcmp("ls",argv[0])==0){ // ls
-        // 解析目录项
-        num_dir = clearDir(argv[1], after_clear);
-        num_file = readInodeMessage(dirname);
+        if(argc == 1){ // 指定根目录
+            num_file = lsDirName(1, dirname);
+        }
+        else{
+            // 解析目录项
+            num_dir = clearDir(argv[1], clear_dir);
+            for(int i = 0; i < num_dir; i++){
+                newinodeID = readInodeMessage(newinodeID, clear_dir[i]);
+                if(newinodeID == 0){ // 找不到对应目录
+                    printf("error path!\n");
+                    return;
+                }
+            }
+            num_file = lsDirName(newinodeID, dirname);
+        }
         printf(".\n");
         printf("..\n");
         for(int i = 0; i < num_file; i++){
@@ -158,22 +153,21 @@ int sh(){
     static char buf[100];
 
     // Read and run input commands.
-  while(getcmd(buf, sizeof(buf)) >= 0){
-    char* argv[MAXARGS];
-    int argc = -1;
-    //重组参数格式
-    clearcmd(buf, argv, &argc);
-    runcmd(argv, argc);
+    while(getcmd(buf, sizeof(buf)) >= 0){
+        char* argv[MAXARGS];
+        int argc = -1;
+        //重组参数格式
+        clearcmd(buf, argv, &argc);
+        runcmd(argv, argc);
   }
   exit(0);
 }
 int main(){
 
     Init();
-    /* sh(); */
-    /* TestInit(); */
+    sh();
     /* 调试代码 */
-    readInodeMessage(char *dirname[]);
+/*     readInodeMessage(char *dirname[]); */
     /* uint32_t inodeID;
     inodeID = create("hello", 1, IsDir, 128);
     printf("inodeID=%d\n",inodeID);
@@ -184,7 +178,15 @@ int main(){
     inodeID = create("hello.c", inodeID, IsFile, 0);
     printf("inodeID=%d\n",inodeID); */
 
-
+    /* int num_dir;
+    char* clear_dir[20];
+    char dir[] = "/home/share/OSLab5.c";
+    printf("%s\n",dir);
+    num_dir = clearDir(dir, clear_dir);
+    printf("num_dir=%d\n",num_dir);
+    for(int i = 0; i < num_dir; i++){
+        printf("clear_dir[%d]=%s\n",i,clear_dir[i]);
+    } */
     /************* 关闭磁盘 *************/
     close_disk();
     return 0;

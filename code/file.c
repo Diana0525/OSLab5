@@ -161,48 +161,6 @@ int mystrcmp(char* a, char* b){
     }
     return 0;
 }
-/**
- * 函数名：TestInit
- * 函数功能:测试Init是否成功初始化磁盘块中的超级块和inode块
- */
-void TestInit(){
-    char *buf_pointer;
-    char buf[Buffer_Length];
-    buf_pointer = buf;
-    sp_block* sp_block;
-    inode* inode;
-    // 验证超级块是否初始化成功
-    /* if(read_data_block(0, buf) == ERROR){
-        exit(-1);
-    } 
-    sp_block = (struct sp_block*) buf_pointer;
-    printf("sp_block->magic_num=%x\n",sp_block->magic_num);
-    printf("sp_block->free_block_count=%d\n",sp_block->free_block_count);
-    printf("sp_block->free_inode_count=%d\n",sp_block->free_inode_count);
-    printf("sp_block->dir_inode_count=%d\n",sp_block->dir_inode_count);
-    // 初始化数据块占用位图为0，注意是按bit记录的，共记录了128*32=4096个数据
-    for(int i = 0; i < 128; i++){
-        printf("sp_block->block_map[%d]=%x\n",i,sp_block->block_map[i]);
-    }
-    for(int i = 0; i < 32; i++){
-        printf("sp_block->inode_map[%d]=%x\n",i,sp_block->inode_map[i]);
-    } */
-
-    // 验证inode块是否初始化成功
-
-    if(read_data_block(1, buf) == ERROR){
-        exit(-1);
-    }
-    buf_pointer = buf;
-    inode = (struct inode*)buf_pointer;
-    printf("buf_pointer=%d\n",buf_pointer);
-    printf("inode->size=%d\n",inode->size);
-    printf("inode->file_type=%d\n",inode->file_type);
-    printf("inode->link=%d\n",inode->link);
-    for(int i = 0; i < 6; i++){
-        printf("inode->block_point[%d]=%d\n",i,inode->block_point[i]);
-    }
-}
 /* 
 * 函数名：findInodeID
 * 函数功能：寻找没有被使用的inode_id,从1~1024
@@ -489,21 +447,17 @@ create(char filename[121], uint32_t inodeID, uint8_t file_type, uint32_t file_si
 
 /* 
 * 函数名：readInodeMessage
-* 函数功能：能够读取inode链接的根目录项的信息
- */
-int readInodeMessage(char *dirname[], uint32_t inodeID){
+* 函数功能：根据输入的inodeID和下一级目录名字，返回下一级目录指向的inodeID
+*/
+uint32_t readInodeMessage(uint32_t inodeID, char name[]){
     char buf[Buffer_Length];
     char *buf_pointer;
     buf_pointer = buf;
     inode inode;
     dir_item* dir_item;
-    int j=0;
-    printf("hello\n");
-    findinodepoint(1, &inode);// 根据ID找到指定inode的地址,默认在根目录
-    for(int i = 0; i < MAXNUM_DIR; i++){ // 根目录最多可以存储6*8=48个目录
-        dirname[i] = &lsName[i][0];
-    }
-    // 读取根目录数据
+    uint32_t newInodeID;
+    findinodepoint(inodeID, &inode);// 根据ID找到指定inode的地址
+    // 读取目录数据
     for(int i = 0; i < BLOCK_POINT_NUM; i++){
         if(inode.block_point[i] != 0){ // 有所指向
             if(read_data_block(inode.block_point[i], buf) == ERROR){
@@ -512,14 +466,50 @@ int readInodeMessage(char *dirname[], uint32_t inodeID){
             dir_item = (struct dir_item*)buf_pointer;
             for(int k = 0; k < DIR_ITEM_NUM; k++){ // 遍历这一块数据块上的8个目录项
                 if(dir_item->valid == 1){ // 若是有效的目录
-                    strcpy(dirname[j++], dir_item->name); // 读取目录名
+                    if(mystrcmp(name, dir_item->name) == 1){
+                        newInodeID = dir_item->inode_id;
+                        return newInodeID;
+                    }
                 }
                 buf_pointer += 128; // 指向下一个目录项
                 dir_item = (struct dir_item*)buf_pointer;
             }
         }
     }
-    // 返回文件数
-    return j;
+    // 找不到相应目录则返回0
+    return 0;
 }
+/* 
+* 函数名：lsDirName
+* 函数功能：遍历显示某个inode中存放的所有目录项名称
+ */
+int lsDirName(uint32_t inodeID, char* dirname[]){
+    char buf[Buffer_Length];
+    char *buf_pointer;
+    buf_pointer = buf;
+    inode inode;
+    dir_item* dir_item;
+    int j=0;
+    findinodepoint(inodeID, &inode);// 根据ID找到指定inode的地址
+    for(int i = 0; i < MAXNUM_DIR; i++){ // 存放目录项名称
+        dirname[i] = &lsName[i][0];
+    }
+    for(int i = 0; i < BLOCK_POINT_NUM; i++){
+        if(inode.block_point[i] != 0){
+            if(read_data_block(inode.block_point[i], buf) == ERROR){
+                exit(-1);
+            }
+            dir_item = (struct dir_item*)buf_pointer;
+            for(int k = 0; k < DIR_ITEM_NUM; k++){ // 遍历这一块数据块上的8个目录项
+                if(dir_item->valid == 1){ // 若是有效的目录
+                    strcpy(dirname[j++], dir_item->name);
+                }
+                buf_pointer += 128; // 指向下一个目录项
+                dir_item = (struct dir_item*)buf_pointer;
+            }
+        }
+    }
+    return j;// 返回目录项总数
+ }
+
 
