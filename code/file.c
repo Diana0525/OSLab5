@@ -4,7 +4,6 @@
 #include <string.h>
 #include "disk.h"
 #include "file.h"
-#include "msh.h"
 
 
 /**
@@ -148,6 +147,19 @@ int Init(){
         printf("write data error!\n");
         exit(-1);
     }
+}
+int mystrcmp(char* a, char* b){
+    int i=0,j=0;
+    while(a[i] != '\0' && b[i] != '\0'){
+        if(a[i] == b[i]){
+            i++;
+            continue;
+        }
+    }
+    if(a[i] == '\0' && b[i] == '\0'){
+        return 1;
+    }
+    return 0;
 }
 /**
  * 函数名：TestInit
@@ -386,10 +398,10 @@ create(char filename[121], uint32_t inodeID, uint8_t file_type, uint32_t file_si
     int temp_file_size;
     /* 根据输入的inodeID找到相应的inode */
     findinodepoint(inodeID, &inode);
-    /* 输入的inode是dir类型或者是根目录 */
+    /* 输入的inode是dir类型 */
     printf("input inodeID=%d\n",inodeID);
     printf("input filetype=%d\n",file_type);
-    if(file_type == IsDir || inodeID == 1){ 
+    if(inode.file_type == IsDir){ 
         /* 根据size判断inode是否已经使用完 */
         if(inode.size >= 128*48){
             printf("no space for new file or dir!\n");
@@ -404,7 +416,10 @@ create(char filename[121], uint32_t inodeID, uint8_t file_type, uint32_t file_si
                 }
                 dir_item = (struct dir_item*) buf_pointer;
                 for(int j = 0; j < DIR_ITEM_NUM; j++){
-
+                    if(mystrcmp(filename, dir_item->name) == 1){ //发现重名
+                        printf("the same name dir/file is already exist!\n");
+                        return 0;
+                    }
                 }
             }
         }
@@ -438,7 +453,6 @@ create(char filename[121], uint32_t inodeID, uint8_t file_type, uint32_t file_si
                         dir_item->valid = 1;
                         dir_item->type = file_type;
                         strcpy(dir_item->name, filename);
-                        /* 超级块需要更新占用目录项的数目 */
                         break;
                     }
 
@@ -457,7 +471,7 @@ create(char filename[121], uint32_t inodeID, uint8_t file_type, uint32_t file_si
             }
         }
     }
-    else if(file_type == IsFile){// 到了创建文件的一步，是最终的步骤
+    else if(file_type == IsFile && inode.file_type == IsFile){// 到了创建文件的一步，是最终的步骤
         printf("!!!\n");
         temp_file_size = file_size;
         for(int i = 0; i < BLOCK_POINT_NUM; i++){
@@ -477,7 +491,7 @@ create(char filename[121], uint32_t inodeID, uint8_t file_type, uint32_t file_si
 * 函数名：readInodeMessage
 * 函数功能：能够读取inode链接的根目录项的信息
  */
-int readInodeMessage(char *dirname[]){
+int readInodeMessage(char *dirname[], uint32_t inodeID){
     char buf[Buffer_Length];
     char *buf_pointer;
     buf_pointer = buf;

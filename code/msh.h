@@ -14,4 +14,4 @@ int fork1(void);
 void panic(char *s);
 void clearcmd(char* cmd, char* argv[],int* argc);
 int clearDir(char *dir, char *clear_dir[]);
-int mystrcmp(char *a, char *b);
+

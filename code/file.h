@@ -63,3 +63,4 @@ void refreshInode(uint32_t inode_id, uint16_t file_type, uint32_t file_size, uin
 uint32_t create(char filename[121], uint32_t inodeID, uint8_t file_type, uint32_t file_size);
 int readInodeMessage(char *dirname[]);
 void findinodepoint(uint32_t inode_id, struct inode* inode);
+int mystrcmp(char *a, char *b);

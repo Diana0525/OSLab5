@@ -116,7 +116,7 @@ clearDir(char* dir, char* clear_dir[]){
 void 
 runcmd(char* argv[],int argc){
     printf("argc = %d",argc);
-    int num_dir;
+    int num_dir,num_file;
     uint32_t newinodeID;
     char *dirname[MAXNUM_DIR];
     newinodeID = 1 ;// 第一个inode的编号是1
@@ -127,6 +127,7 @@ runcmd(char* argv[],int argc){
             // 新建目录项
             newinodeID = create(after_clear[i], newinodeID, IsDir, 128);
         }
+        newinodeID = create(after_clear[num_dir-1], newinodeID, IsFile, 128); // 创建指向文件的目录项
         if(create(after_clear[num_dir-1], newinodeID, IsFile, 0) == 0){ // 默认文件大小为0
             printf("touch file success!\n");
         }
@@ -140,29 +141,18 @@ runcmd(char* argv[],int argc){
         }
     }
     else if(mystrcmp("ls",argv[0])==0){ // ls
-        num_dir = readInodeMessage(dirname);
+        // 解析目录项
+        num_dir = clearDir(argv[1], after_clear);
+        num_file = readInodeMessage(dirname);
         printf(".\n");
         printf("..\n");
-        for(int i = 0; i < num_dir; i++){
+        for(int i = 0; i < num_file; i++){
             printf("%s\n",dirname[i]);
         }
     }
     else if(mystrcmp("shutdown",argv[0])){
         exit(0);
     }
-}
-int mystrcmp(char* a, char* b){
-    int i=0,j=0;
-    while(a[i] != '\0' && b[i] != '\0'){
-        if(a[i] == b[i]){
-            i++;
-            continue;
-        }
-    }
-    if(a[i] == '\0' && b[i] == '\0'){
-        return 1;
-    }
-    return 0;
 }
 int sh(){
     static char buf[100];
@@ -183,7 +173,18 @@ int main(){
     /* sh(); */
     /* TestInit(); */
     /* 调试代码 */
-    readInodeMessage(char *dirname[])
+    readInodeMessage(char *dirname[]);
+    /* uint32_t inodeID;
+    inodeID = create("hello", 1, IsDir, 128);
+    printf("inodeID=%d\n",inodeID);
+    inodeID = create("world", inodeID, IsDir, 128);
+    printf("inodeID=%d\n",inodeID);
+    inodeID = create("hello.c", inodeID, IsFile, 128);
+    printf("inodeID=%d\n",inodeID);
+    inodeID = create("hello.c", inodeID, IsFile, 0);
+    printf("inodeID=%d\n",inodeID); */
+
+
     /************* 关闭磁盘 *************/
     close_disk();
     return 0;
