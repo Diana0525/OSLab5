@@ -127,10 +127,22 @@ runcmd(char* argv[],int argc){
     else if(mystrcmp("mkdir",argv[0]) == 1){
         // 解析目录项
         num_dir=clearDir(argv[1], clear_dir);
-        for(i = 0; i < num_dir; i++){ // num_dir表示目录项
+        for(i = 0; i < num_dir-1; i++){ // 依次判断目录项是否已经存在，若存在则返回inodeID
+            temp = newinodeID;
+            newinodeID = findInodeforItem(newinodeID, clear_dir[i], IsDir);
+            if(newinodeID == 0){ // 表示目录项不存在，需要创建
+                newinodeID = temp;
+                break;
+            }
+        }
+        for( ; i < num_dir; i++){ // num_dir-1表示目录项
             // 新建目录项
             newinodeID = create(clear_dir[i], newinodeID, IsDir, 128);
         }
+        // for(i = 0; i < num_dir; i++){ // num_dir表示目录项
+        //     // 新建目录项
+        //     newinodeID = create(clear_dir[i], newinodeID, IsDir, 128);
+        // }
     }
     else if(mystrcmp("ls",argv[0]) == 1){ // ls
         // 解析目录项
