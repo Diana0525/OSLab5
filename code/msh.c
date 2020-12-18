@@ -52,12 +52,6 @@ clearcmd(char* cmd, char* argv[],int* argc){
     }
     argv[i] = 0;
     *argc = i;
-    /* 调试代码 */
-    printf("i=%d\n",i);
-    printf("argc = %d\n",*argc);
-    printf("argv[0]=%s\n",argv[0]);
-    printf("argv[1]=%s\n",argv[1]);
-    
 }
 /* 
 * 函数名：clearDir
@@ -67,6 +61,9 @@ clearcmd(char* cmd, char* argv[],int* argc){
 int
 clearDir(char* dir, char* clear_dir[]){
     int i=0,j=0,count=0;
+    if(dir[0] == '\0' && dir[1] == '/'){
+        return 0;// 表示只有一个斜杠，没有目录项，默认为根目录
+    }
     for(int i=0; i<MAXARGS; i++){
         clear_dir[i] = &after_clear[i][0];
     }
@@ -88,7 +85,12 @@ clearDir(char* dir, char* clear_dir[]){
         }
         dir[j] = '\0';
     }
-    clear_dir[i] = dir+j;
+    if(count == 1){ // 针对只有一个目录项的特殊情况
+        clear_dir[0] = dir+1;
+    }
+    else{
+        clear_dir[i] = dir+j;
+    }
     return count;
  }
 /* 
@@ -97,40 +99,51 @@ clearDir(char* dir, char* clear_dir[]){
  */
 void 
 runcmd(char* argv[],int argc){
-    printf("argc = %d\n",argc);
     int num_dir,num_file;// num_dir表示有多少级目录，num_file表示该目录最终有多少文件
-    uint32_t newinodeID;
+    uint32_t newinodeID = 1,temp=1,old_InodeID;// 第一个inode的编号是1
     char *dirname[MAXNUM_DIR];// 存储ls输出的内容
-    char* clear_dir[MAXARGS];
-    newinodeID = 1 ;// 第一个inode的编号是1
-    if(mystrcmp("touch",argv[0])==0){// 是创建文件的命令
+    char* clear_dir[MAXARGS]; // 存储/之间的目录项名称
+    int i = 0;
+    if(mystrcmp("touch",argv[0]) == 1){// 是创建文件的命令
         // 解析目录项
         num_dir=clearDir(argv[1], clear_dir);
-        for(int i = 0; i < num_dir-1; i++){ // num_dir-1表示目录项
+        printf("num_dir=%d\n",num_dir);
+        for(i = 0; i < num_dir-1; i++){ // 依次判断目录项是否已经存在，若存在则返回inodeID
+            temp = newinodeID;
+            newinodeID = findInodeforItem(newinodeID, clear_dir[i], IsDir);
+            if(newinodeID == 0){ // 表示目录项不存在，需要创建
+                newinodeID = temp;
+                break;
+            }
+        }
+        for( ; i < num_dir-1; i++){ // num_dir-1表示目录项
             // 新建目录项
             newinodeID = create(clear_dir[i], newinodeID, IsDir, 128);
         }
         newinodeID = create(clear_dir[num_dir-1], newinodeID, IsFile, 128); // 创建指向文件的目录项
-        if(create(clear_dir[num_dir-1], newinodeID, IsFile, 0) == 0){ // 默认文件大小为0
+        if(create(clear_dir[num_dir-1], newinodeID, IsFile, 0) == 1){ // 默认文件大小为0
             printf("touch file success!\n");
         }
     }
-    else if(mystrcmp("mkdir",argv[0])==0){
+    else if(mystrcmp("mkdir",argv[0]) == 1){
         // 解析目录项
         num_dir=clearDir(argv[1], clear_dir);
-        for(int i = 0; i < num_dir; i++){ // num_dir表示目录项
+        for(i = 0; i < num_dir; i++){ // num_dir表示目录项
             // 新建目录项
             newinodeID = create(clear_dir[i], newinodeID, IsDir, 128);
+            printf("inodeID=%d\n",newinodeID);
         }
     }
-    else if(mystrcmp("ls",argv[0])==0){ // ls
-        if(argc == 1){ // 指定根目录
+    else if(mystrcmp("ls",argv[0]) == 1){ // ls
+        // 解析目录项
+        if(argv[1] != 0){ // 若后面接着目录项，则解析目录
+            num_dir = clearDir(argv[1], clear_dir);
+        }
+        if(argc == 1 || (argc == 2 && mystrcmp("/",argv[1]) == 1)){ // 指定根目录
             num_file = lsDirName(1, dirname);
         }
         else{
-            // 解析目录项
-            num_dir = clearDir(argv[1], clear_dir);
-            for(int i = 0; i < num_dir; i++){
+            for(i = 0; i < num_dir; i++){
                 newinodeID = readInodeMessage(newinodeID, clear_dir[i]);
                 if(newinodeID == 0){ // 找不到对应目录
                     printf("error path!\n");
@@ -141,11 +154,55 @@ runcmd(char* argv[],int argc){
         }
         printf(".\n");
         printf("..\n");
-        for(int i = 0; i < num_file; i++){
+        for(i = 0; i < num_file; i++){
             printf("%s\n",dirname[i]);
         }
     }
-    else if(mystrcmp("shutdown",argv[0])){
+    else if (mystrcmp("cp",argv[0]) == 1)
+    {
+        if(argc < 3){
+            printf("lack for something!\n");
+            return 0;// 命令错误
+        }
+        // argv[1] 中存放被复制文件的路径
+        // argv[2] 中存放需要新建的文件路径
+        // 解析目录项
+        num_dir=clearDir(argv[1], clear_dir); // 解析被复制的文件的目录
+        for ( i = 0; i < num_dir-1; i++) // 根据目录项寻找inodeID
+        {
+            newinodeID = findInodeforItem(newinodeID, clear_dir[i], IsDir);
+            printf("被复制目录：newinodeID=%d\n",newinodeID);
+            if(newinodeID == 0){
+                printf("can't find file!");// 找不到相应的目录
+            }
+        }
+        old_InodeID = findInodeforItem(newinodeID, clear_dir[num_dir-1], IsFile);// 找到被复制文件的inodeID
+        printf("被复制目录：newinodeID=%d\n",old_InodeID);
+        newinodeID = 1; // 重置为1，准备新建目的目录的文件
+        num_dir=clearDir(argv[2], clear_dir); // 解析被复制的文件的目录
+        printf("查找目标目录：newinodeID=%d\n",newinodeID);
+        for( i = 0; i < num_dir-1; i++){
+            temp = newinodeID;
+            newinodeID = findInodeforItem(newinodeID, clear_dir[i], IsDir);
+            printf("查找目标目录：newinodeID=%d\n",newinodeID);
+            if(newinodeID == 0){ // 表示目录项不存在，需要创建
+                newinodeID = temp;
+                break;
+            }
+        }
+        printf("查找目标目录：newinodeID=%d\n",newinodeID);
+        for( ; i < num_dir-1; i++){ // num_dir-1表示目录项
+            // 新建目录项
+            newinodeID = create(clear_dir[i], newinodeID, IsDir, 128);
+            printf("查找目标目录：newinodeID=%d\n",newinodeID);
+        }
+        newinodeID = create(clear_dir[num_dir-1], newinodeID, IsFile, 128); // 创建指向文件的目录项
+        printf("查找目标目录：newinodeID=%d\n",newinodeID);
+        if(copyFile(old_InodeID, newinodeID) == 1){
+            printf("copy successfully!\n");
+        }
+    }
+    else if(mystrcmp("shutdown",argv[0]) == 1){
         exit(0);
     }
 }
@@ -186,6 +243,14 @@ int main(){
     printf("num_dir=%d\n",num_dir);
     for(int i = 0; i < num_dir; i++){
         printf("clear_dir[%d]=%s\n",i,clear_dir[i]);
+    } */
+    /* static char buf[100];
+    while(getcmd(buf, sizeof(buf)) >= 0){
+        char* argv[MAXARGS];
+        int argc = -1;
+        //重组参数格式
+        clearcmd(buf, argv, &argc);
+        printf("result:%d\n",mystrcmp("mkdir",argv[0]));
     } */
     /************* 关闭磁盘 *************/
     close_disk();

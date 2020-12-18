@@ -155,11 +155,13 @@ int mystrcmp(char* a, char* b){
             i++;
             continue;
         }
+        else{
+            return 0;// 出现一个不相等的就返回0       
+        }
     }
     if(a[i] == '\0' && b[i] == '\0'){
         return 1;
     }
-    return 0;
 }
 /* 
 * 函数名：findInodeID
@@ -357,8 +359,6 @@ create(char filename[121], uint32_t inodeID, uint8_t file_type, uint32_t file_si
     /* 根据输入的inodeID找到相应的inode */
     findinodepoint(inodeID, &inode);
     /* 输入的inode是dir类型 */
-    printf("input inodeID=%d\n",inodeID);
-    printf("input filetype=%d\n",file_type);
     if(inode.file_type == IsDir){ 
         /* 根据size判断inode是否已经使用完 */
         if(inode.size >= 128*48){
@@ -372,12 +372,16 @@ create(char filename[121], uint32_t inodeID, uint8_t file_type, uint32_t file_si
                     printf("error!\n");
                     exit(-1);
                 }
-                dir_item = (struct dir_item*) buf_pointer;
+                buf_pointer = buf;
                 for(int j = 0; j < DIR_ITEM_NUM; j++){
-                    if(mystrcmp(filename, dir_item->name) == 1){ //发现重名
-                        printf("the same name dir/file is already exist!\n");
-                        return 0;
+                    dir_item = (struct dir_item*) buf_pointer;
+                    if(dir_item->valid == 1){
+                        if(mystrcmp(filename, dir_item->name) == 1){ //发现重名
+                            printf("the same name dir/file is already exist!\n");
+                            return 0;
+                        }
                     }
+                    buf_pointer += 128;
                 }
             }
         }
@@ -386,36 +390,28 @@ create(char filename[121], uint32_t inodeID, uint8_t file_type, uint32_t file_si
             if((inode.block_point[i] != 0   // 若找到一个已经被使用过的数据块
             && inode.size < (i+1)*1024)    // 且小于该值表示该目录项数据块还有空余的空间,当前是目录才进行size判断
             || inode.block_point[i] == 0){ // 或者是找到了一个未被使用过的数据块
-                printf("第%d块有空闲\n",i);
-                //此时该inode将新建一个目录项，则size+128
-                printf("inode.size=%d\n",inode.size);
                 // 读取该目录项数据块
                 if(inode.block_point[i] == 0){// 需要选出一块未被使用的数据块，被这个指针所指向
                     BlockID = findBlockID();// 找出一块未被使用的数据块
-                    printf("选出新的数据块号：%d\n",BlockID);
                     inode.block_point[i] = BlockID; // 使得指针指向此块新的数据块
                     refreshBlockmapinSuperBlock(BlockID, Occupy);/* 更新数据块位图 */
                 }
-                printf("开启的数据块为：inode.block_point[%d]=%d\n",i,inode.block_point[i]);
                 if((read_data_block(inode.block_point[i], buf)) == ERROR){
                     printf("error!\n");
                     exit(-1);
                 }
-                dir_item = (struct dir_item*) buf_pointer;
+                buf_pointer = buf;
                 for(int j = 0; j < DIR_ITEM_NUM; j++){// 遍历此数据块中的8个目录项，找到未使用的一个目录项
-                    printf("dir_item->inode_id=%d\n",dir_item->inode_id);
+                    dir_item = (struct dir_item*) buf_pointer;
                     if(dir_item->inode_id == 0){// 找到了未使用的
                         dir_item->inode_id = findInodeID();
                         newInodeID = dir_item->inode_id;
-                        printf("新ID为%d\n",newInodeID);
                         dir_item->valid = 1;
                         dir_item->type = file_type;
                         strcpy(dir_item->name, filename);
                         break;
                     }
-
                     buf_pointer += 128;
-                    dir_item = (struct dir_item*) buf_pointer;
                 }
                 // 写回该目录项数据块
                 if((write_data_block(inode.block_point[i], buf)) == ERROR){
@@ -430,17 +426,16 @@ create(char filename[121], uint32_t inodeID, uint8_t file_type, uint32_t file_si
         }
     }
     else if(file_type == IsFile && inode.file_type == IsFile){// 到了创建文件的一步，是最终的步骤
-        printf("!!!\n");
         temp_file_size = file_size;
         for(int i = 0; i < BLOCK_POINT_NUM; i++){
-            if(inode.block_point[i] == 0 && temp_file_size > 0){ // 找到了一个未被使用过的数据块
+            if(inode.block_point[i] == 0 && temp_file_size > 0){ // 找到了一个未被使用过的数据块指针位
                 BlockID = findBlockID();// 找出一块未被使用的数据块
-                inode.block_point[i] = NUMBLOCK(BlockID); // 使得指针指向此块新的数据块
+                inode.block_point[i] = BlockID; // 使得指针指向此块新的数据块
                 refreshBlockmapinSuperBlock(BlockID, Occupy);// 更新数据块位图，表示该数据块存放了数据 
                 inode.size = temp_file_size;
                 temp_file_size -= 1024;
             }
-            return 0;// 表示创建文件成功，没必要返回新inode_id
+            return 1;// 表示创建文件成功，没必要返回新inode_id
         }
     }
 }
@@ -499,17 +494,78 @@ int lsDirName(uint32_t inodeID, char* dirname[]){
             if(read_data_block(inode.block_point[i], buf) == ERROR){
                 exit(-1);
             }
-            dir_item = (struct dir_item*)buf_pointer;
+            buf_pointer = buf;
             for(int k = 0; k < DIR_ITEM_NUM; k++){ // 遍历这一块数据块上的8个目录项
+                dir_item = (struct dir_item*)buf_pointer;
                 if(dir_item->valid == 1){ // 若是有效的目录
                     strcpy(dirname[j++], dir_item->name);
                 }
                 buf_pointer += 128; // 指向下一个目录项
-                dir_item = (struct dir_item*)buf_pointer;
+                
             }
         }
     }
     return j;// 返回目录项总数
  }
 
+/* 
+* 函数名：findInodeforItem
+* 函数功能：根据输入的inodeID（上一级目录的）和目录名称、目录项类型，找到该名称目录对应的inodeID
+ */
+uint32_t findInodeforItem(uint32_t inodeID, char name[], uint8_t file_type){
+    char buf[Buffer_Length];
+    char *buf_pointer;
+    buf_pointer = buf;
+    inode inode;
+    dir_item* dir_item;
+    findinodepoint(inodeID, &inode);// 根据ID找到指定inode的地址
+    for(int i = 0; i < BLOCK_POINT_NUM; i++){ //在inode的6个block_point中寻找
+        if(inode.block_point[i] != 0){
+            if(read_data_block(inode.block_point[i], buf) == ERROR){
+                exit(-1);
+            }
+            buf_pointer = buf;
 
+            for(int j = 0; j < DIR_ITEM_NUM; j++){
+                dir_item = (struct dir_item*)buf_pointer;
+                if(dir_item->valid == 1){ // 若是有效目录，则比对目录名称信息
+                    if(mystrcmp(name, dir_item->name) && dir_item->type == file_type){
+                        return dir_item->inode_id;
+                    }
+                }
+                buf_pointer += 128; // 指向下一个目录项
+            }
+        }
+    }
+    return 0; // 找不到则返回0
+}
+
+/* 
+* 函数名：copyFile
+* 函数功能：根据输入的两个inodeID,将前一个id的文件内容复制给后一个id
+ */
+int copyFile(uint32_t sre_inodeID, uint32_t dst_inodeID){
+    char buf[Buffer_Length];
+    struct inode inodeOne;
+    struct inode inodeTwo;
+    findinodepoint(sre_inodeID, &inodeOne);
+    findinodepoint(dst_inodeID, &inodeTwo);
+    inodeTwo.file_type = inodeOne.file_type;
+    inodeTwo.link = inodeOne.link;
+    inodeTwo.size = inodeOne.size;
+    for(int i = 0; i < BLOCK_POINT_NUM; i++){
+        if(inodeOne.block_point[i] != 0){ // 找到被复制的文件的数据块指针
+            if(read_data_block(inodeOne.block_point[i], buf) == ERROR){
+                printf("error!\n");
+                exit(-1);
+            }
+            inodeTwo.block_point[i] = findBlockID();
+            refreshBlockmapinSuperBlock(inodeTwo.block_point[i], Occupy);// 更新数据块位图，表示该数据块存放了数据 
+            if(write_data_block(inodeTwo.block_point[i], buf) == ERROR){
+                printf("write error!\n");
+                exit(-1);
+            }
+        }
+    }
+    return 1; //复制完成
+}

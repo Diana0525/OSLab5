@@ -65,3 +65,5 @@ uint32_t readInodeMessage(uint32_t inodeID, char name[]);
 void findinodepoint(uint32_t inode_id, struct inode* inode);
 int mystrcmp(char *a, char *b);
 int lsDirName(uint32_t inodeID, char* dirname[]);
+uint32_t findInodeforItem(uint32_t inodeID, char name[], uint8_t file_type);
+int copyFile(uint32_t sre_inodeID, uint32_t dst_inodeID);
