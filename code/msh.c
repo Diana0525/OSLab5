@@ -107,7 +107,6 @@ runcmd(char* argv[],int argc){
     if(mystrcmp("touch",argv[0]) == 1){// 是创建文件的命令
         // 解析目录项
         num_dir=clearDir(argv[1], clear_dir);
-        printf("num_dir=%d\n",num_dir);
         for(i = 0; i < num_dir-1; i++){ // 依次判断目录项是否已经存在，若存在则返回inodeID
             temp = newinodeID;
             newinodeID = findInodeforItem(newinodeID, clear_dir[i], IsDir);
@@ -131,7 +130,6 @@ runcmd(char* argv[],int argc){
         for(i = 0; i < num_dir; i++){ // num_dir表示目录项
             // 新建目录项
             newinodeID = create(clear_dir[i], newinodeID, IsDir, 128);
-            printf("inodeID=%d\n",newinodeID);
         }
     }
     else if(mystrcmp("ls",argv[0]) == 1){ // ls
@@ -171,33 +169,26 @@ runcmd(char* argv[],int argc){
         for ( i = 0; i < num_dir-1; i++) // 根据目录项寻找inodeID
         {
             newinodeID = findInodeforItem(newinodeID, clear_dir[i], IsDir);
-            printf("被复制目录：newinodeID=%d\n",newinodeID);
             if(newinodeID == 0){
                 printf("can't find file!");// 找不到相应的目录
             }
         }
         old_InodeID = findInodeforItem(newinodeID, clear_dir[num_dir-1], IsFile);// 找到被复制文件的inodeID
-        printf("被复制目录：newinodeID=%d\n",old_InodeID);
         newinodeID = 1; // 重置为1，准备新建目的目录的文件
         num_dir=clearDir(argv[2], clear_dir); // 解析被复制的文件的目录
-        printf("查找目标目录：newinodeID=%d\n",newinodeID);
         for( i = 0; i < num_dir-1; i++){
             temp = newinodeID;
             newinodeID = findInodeforItem(newinodeID, clear_dir[i], IsDir);
-            printf("查找目标目录：newinodeID=%d\n",newinodeID);
             if(newinodeID == 0){ // 表示目录项不存在，需要创建
                 newinodeID = temp;
                 break;
             }
         }
-        printf("查找目标目录：newinodeID=%d\n",newinodeID);
         for( ; i < num_dir-1; i++){ // num_dir-1表示目录项
             // 新建目录项
             newinodeID = create(clear_dir[i], newinodeID, IsDir, 128);
-            printf("查找目标目录：newinodeID=%d\n",newinodeID);
         }
         newinodeID = create(clear_dir[num_dir-1], newinodeID, IsFile, 128); // 创建指向文件的目录项
-        printf("查找目标目录：newinodeID=%d\n",newinodeID);
         if(copyFile(old_InodeID, newinodeID) == 1){
             printf("copy successfully!\n");
         }
@@ -223,36 +214,6 @@ int main(){
 
     Init();
     sh();
-    /* 调试代码 */
-/*     readInodeMessage(char *dirname[]); */
-    /* uint32_t inodeID;
-    inodeID = create("hello", 1, IsDir, 128);
-    printf("inodeID=%d\n",inodeID);
-    inodeID = create("world", inodeID, IsDir, 128);
-    printf("inodeID=%d\n",inodeID);
-    inodeID = create("hello.c", inodeID, IsFile, 128);
-    printf("inodeID=%d\n",inodeID);
-    inodeID = create("hello.c", inodeID, IsFile, 0);
-    printf("inodeID=%d\n",inodeID); */
-
-    /* int num_dir;
-    char* clear_dir[20];
-    char dir[] = "/home/share/OSLab5.c";
-    printf("%s\n",dir);
-    num_dir = clearDir(dir, clear_dir);
-    printf("num_dir=%d\n",num_dir);
-    for(int i = 0; i < num_dir; i++){
-        printf("clear_dir[%d]=%s\n",i,clear_dir[i]);
-    } */
-    /* static char buf[100];
-    while(getcmd(buf, sizeof(buf)) >= 0){
-        char* argv[MAXARGS];
-        int argc = -1;
-        //重组参数格式
-        clearcmd(buf, argv, &argc);
-        printf("result:%d\n",mystrcmp("mkdir",argv[0]));
-    } */
-    /************* 关闭磁盘 *************/
     close_disk();
     return 0;
 }
