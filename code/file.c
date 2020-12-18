@@ -376,7 +376,7 @@ create(char filename[121], uint32_t inodeID, uint8_t file_type, uint32_t file_si
                 for(int j = 0; j < DIR_ITEM_NUM; j++){
                     dir_item = (struct dir_item*) buf_pointer;
                     if(dir_item->valid == 1){
-                        if(mystrcmp(filename, dir_item->name) == 1){ //发现重名
+                        if((mystrcmp(filename, dir_item->name) == 1) && dir_item->type == file_type){ //发现重名
                             printf("the same name dir/file is already exist!\n");
                             return 0;
                         }
