@@ -76,10 +76,10 @@ int Init(){
     }
     sp_block->magic_num = 0xdec0de;  // 给幻数赋值
     // 4M空间，1个数据块1K，共有4096个数据块
-    sp_block->free_block_count = 4096;
-    sp_block->free_inode_count = 1024;
+    sp_block->free_block_count = 4096-1-32;// 分配了33块给元数据
+    sp_block->free_inode_count = 1024-1;// 分配了一个给根目录
     // dir_inode_count 指的是被占用的目录inode数
-    sp_block->dir_inode_count = 0;// 根目录占据了一个目录inode
+    sp_block->dir_inode_count = 0;// 占用目录初始化为0
     // 初始化数据块占用位图为0，注意是按bit记录的，共记录了128*32=4096个数据
     for(int i = 0; i < 128; i++){
         sp_block->block_map[i] = 0;
@@ -196,7 +196,7 @@ uint32_t findInodeID(){
 }
 /* 
 * 函数名：findBlockID
-* 函数功能：寻找没有被使用的数据块,从1到4063
+* 函数功能：寻找没有被使用的数据块,从33到4095
 */
 uint32_t findBlockID(){
     char *buf_pointer;
@@ -346,6 +346,7 @@ void refreshInode(uint32_t inode_id, uint16_t file_type, uint32_t file_size, uin
  * 函数名：create
  * 函数功能：根据指定的文件名创建新目录
  * 入口参数：文件名，inode指针，filetype表示文件或目录
+ * 返回值：创建的新目录项的inodeID
  */
 uint32_t
 create(char filename[121], uint32_t inodeID, uint8_t file_type, uint32_t file_size){
@@ -461,7 +462,7 @@ uint32_t readInodeMessage(uint32_t inodeID, char name[]){
             dir_item = (struct dir_item*)buf_pointer;
             for(int k = 0; k < DIR_ITEM_NUM; k++){ // 遍历这一块数据块上的8个目录项
                 if(dir_item->valid == 1){ // 若是有效的目录
-                    if(mystrcmp(name, dir_item->name) == 1){
+                    if((mystrcmp(name, dir_item->name) == 1) && dir_item->type == IsDir){
                         newInodeID = dir_item->inode_id;
                         return newInodeID;
                     }
@@ -548,8 +549,8 @@ int copyFile(uint32_t sre_inodeID, uint32_t dst_inodeID){
     char buf[Buffer_Length];
     struct inode inodeOne;
     struct inode inodeTwo;
-    findinodepoint(sre_inodeID, &inodeOne);
-    findinodepoint(dst_inodeID, &inodeTwo);
+    findinodepoint(sre_inodeID, &inodeOne);// 根据id找到inode，inodeOne表示被复制的文件
+    findinodepoint(dst_inodeID, &inodeTwo);// 根据id找到inode，inodeTwo表示需要复制的文件
     inodeTwo.file_type = inodeOne.file_type;
     inodeTwo.link = inodeOne.link;
     inodeTwo.size = inodeOne.size;

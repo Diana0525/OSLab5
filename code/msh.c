@@ -105,7 +105,7 @@ runcmd(char* argv[],int argc){
     char* clear_dir[MAXARGS]; // 存储/之间的目录项名称
     int i = 0;
     if(mystrcmp("touch",argv[0]) == 1){// 是创建文件的命令
-        // 解析目录项
+        // 解析路径
         num_dir=clearDir(argv[1], clear_dir);
         for(i = 0; i < num_dir-1; i++){ // 依次判断目录项是否已经存在，若存在则返回inodeID
             temp = newinodeID;
@@ -125,7 +125,7 @@ runcmd(char* argv[],int argc){
         }
     }
     else if(mystrcmp("mkdir",argv[0]) == 1){
-        // 解析目录项
+        // 解析路径
         num_dir=clearDir(argv[1], clear_dir);
         for(i = 0; i < num_dir-1; i++){ // 依次判断目录项是否已经存在，若存在则返回inodeID
             temp = newinodeID;
@@ -139,13 +139,9 @@ runcmd(char* argv[],int argc){
             // 新建目录项
             newinodeID = create(clear_dir[i], newinodeID, IsDir, 128);
         }
-        // for(i = 0; i < num_dir; i++){ // num_dir表示目录项
-        //     // 新建目录项
-        //     newinodeID = create(clear_dir[i], newinodeID, IsDir, 128);
-        // }
     }
     else if(mystrcmp("ls",argv[0]) == 1){ // ls
-        // 解析目录项
+        // 解析路径
         if(argv[1] != 0){ // 若后面接着目录项，则解析目录
             num_dir = clearDir(argv[1], clear_dir);
         }
@@ -176,7 +172,7 @@ runcmd(char* argv[],int argc){
         }
         // argv[1] 中存放被复制文件的路径
         // argv[2] 中存放需要新建的文件路径
-        // 解析目录项
+        // 解析路径
         num_dir=clearDir(argv[1], clear_dir); // 解析被复制的文件的目录
         for ( i = 0; i < num_dir-1; i++) // 根据目录项寻找inodeID
         {
@@ -187,7 +183,7 @@ runcmd(char* argv[],int argc){
         }
         old_InodeID = findInodeforItem(newinodeID, clear_dir[num_dir-1], IsFile);// 找到被复制文件的inodeID
         newinodeID = 1; // 重置为1，准备新建目的目录的文件
-        num_dir=clearDir(argv[2], clear_dir); // 解析被复制的文件的目录
+        num_dir=clearDir(argv[2], clear_dir); // 解析被复制的文件的路径
         for( i = 0; i < num_dir-1; i++){
             temp = newinodeID;
             newinodeID = findInodeforItem(newinodeID, clear_dir[i], IsDir);
@@ -206,6 +202,8 @@ runcmd(char* argv[],int argc){
         }
     }
     else if(mystrcmp("shutdown",argv[0]) == 1){
+        /************* 关闭磁盘 *************/
+        close_disk();
         exit(0);
     }
 }
@@ -223,9 +221,7 @@ int sh(){
   exit(0);
 }
 int main(){
-
     Init();
     sh();
-    close_disk();
     return 0;
 }
